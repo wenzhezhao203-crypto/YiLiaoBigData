@@ -169,7 +169,7 @@ POST /ai/chat
 - [x] 测试至少 8 类预设问题及 2 类无法识别问题。
 - [ ] 验证 Flask 服务不可用、模型服务不可用和工具超时的提示。
 - [x] 执行 Python 检查与 `npm run lint`、`npm run build`。
-- [ ] 提交 Git：`feat: 实现 AI Agent 对话助手一期`。
+- [x] 提交 Git：`feat: 实现 AI Agent 对话助手一期`。
 
 验收：侧边栏能稳定完成至少一轮“自然语言问题 -> 数据工具 -> 中文回答”的真实交互。
 
