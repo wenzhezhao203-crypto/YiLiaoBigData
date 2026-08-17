@@ -1,7 +1,7 @@
 "use client";
 
 import { Bot, ChevronDown, LoaderCircle, Send, Sparkles, Wrench, X } from "lucide-react";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, ReactNode, useRef, useState } from "react";
 import { streamAgentMessage, type AgentToolCall } from "@/lib/agent-api";
 
 type Message = {
@@ -12,6 +12,46 @@ type Message = {
 };
 
 const SUGGESTIONS = ["全量数据的急诊患者占比是多少？", "住院量最高的疾病系统是什么？", "哪家医院的出院量最高？"];
+
+function renderInline(text: string): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={index}>{part.slice(2, -2)}</strong>
+      : part,
+  );
+}
+
+function renderAssistantContent(content: string) {
+  const lines = content.replace(/\r/g, "").split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    if (!line) {
+      index += 1;
+      continue;
+    }
+    if (/^#{1,3}\s+/.test(line)) {
+      blocks.push(<h3 key={index}>{renderInline(line.replace(/^#{1,3}\s+/, ""))}</h3>);
+      index += 1;
+      continue;
+    }
+    if (/^(?:[-*]|\d+\.)\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^(?:[-*]|\d+\.)\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^(?:[-*]|\d+\.)\s+/, ""));
+        index += 1;
+      }
+      blocks.push(<ul key={`list-${index}`}>{items.map((item, itemIndex) => <li key={itemIndex}>{renderInline(item)}</li>)}</ul>);
+      continue;
+    }
+    blocks.push(<p key={index}>{renderInline(line)}</p>);
+    index += 1;
+  }
+
+  return blocks.length ? blocks : <span className="agent-cursor" aria-label="正在生成回答" />;
+}
 
 export function AgentSidebar() {
   const [open, setOpen] = useState(false);
@@ -67,7 +107,7 @@ export function AgentSidebar() {
       </header>
       <div className="agent-messages" aria-live="polite">
         {messages.map(message => <article className={`agent-message ${message.role}`} key={message.id}>
-          {message.role === "assistant" && <Bot size={15}/>}<div><p>{message.content}</p>{message.toolCalls?.map(tool => <span className={`agent-tool ${tool.status}`} key={`${message.id}-${tool.name}`}><Wrench size={11}/>{tool.name}</span>)}</div>
+          {message.role === "assistant" && <Bot size={15}/>}<div className="agent-bubble">{message.role === "assistant" ? renderAssistantContent(message.content) : <p>{message.content}</p>}{message.toolCalls?.map(tool => <span className={`agent-tool ${tool.status}`} key={`${message.id}-${tool.name}`}><Wrench size={11}/>{tool.name}</span>)}</div>
         </article>)}
         {sending && <article className="agent-message assistant"><LoaderCircle className="agent-spin" size={15}/><div><p>正在调用数据分析工具...</p></div></article>}
       </div>
