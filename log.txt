@@ -1,0 +1,101 @@
+(BigData) PS C:\Users\86180\Desktop\医疗项目src> & "C:\useApp\Python\myVenv\BigData\Scripts\python.exe" `
+>>   data_pipeline\clean_and_load.py
+{'input_rows': 2101588, 'clean_rows': 2097430, 'inserted_rows': 2091224, 'exact_duplicate_rows': 969, 'discarded_core_missing_rows': 3189, 'invalid_numeric_values': 2103268, 'code_description_mismatches': 0}
+
+Another Type Not Listed
+Cancer Center or Children's Hospital
+Court/Law Enforcement
+Critical Access Hospital
+Expired
+Facility w/ Custodial/Supportive Care
+Federal Health Care Facility
+Home or Self Care
+Home w/ Home Health Services
+Hosp Basd Medicare Approved Swing Bed
+Hospice - Home
+Hospice - Medical Facility
+Inpatient Rehabilitation Facility
+Left Against Medical Advice
+Medicaid Cert Nursing Facility
+Medicare Cert Long Term Care Hospital
+Psychiatric Hospital or Unit of Hosp
+Short-term Hospital
+Skilled Nursing Home
+
+ *  *   null个数
+hospital_service_area	8	10628
+hospital_county	57	10628
+race	4	0
+ethnicity	4	0
+ccsr_diagnosis_code	477	0
+ccsr_procedure_code	320	571414
+apr_drg_code	334	0
+apr_mdc_code	26	0
+apr_mdc_description	26	0
+
+hospital_service_area
+New York City	934394
+Long Island	339214
+Hudson Valley	227135
+Central NY	146754
+Western NY	143571
+Finger Lakes	142531
+Capital/Adirond	119488
+Southern Tier	27509
+NULL 10628
+
+hospital_county		
+Manhattan	363344
+Kings	189648
+Nassau	182618
+Queens	169722
+Bronx	162060
+Suffolk	156596
+*****
+
+ethnicity
+Not Span/Hispanic	1565629
+Spanish/Hispanic	323069
+Unknown	197811
+Multi-ethnic	4715
+
+apr_mdc_code
+05	258691
+14	220829
+04	211390
+15	199263
+06	160840
+****
+
+apr_mdc_description
+DISEASES AND DISORDERS OF THE CIRCULATORY SYSTEM	258691
+PREGNANCY, CHILDBIRTH AND THE PUERPERIUM	220829
+DISEASES AND DISORDERS OF THE RESPIRATORY SYSTEM	211390
+NEWBORNS AND OTHER NEONATES WITH CONDITIONS ORIGINATING IN THE PERINATAL PERIOD	199263
+DISEASES AND DISORDERS OF THE DIGESTIVE SYSTEM	160840
+DISEASES AND DISORDERS OF THE MUSCULOSKELETAL SYSTEM AND CONNECTIVE TISSUE	159536
+INFECTIOUS AND PARASITIC DISEASES (SYSTEMIC OR UNSPECIFIED SITES)	156048
+DISEASES AND DISORDERS OF THE NERVOUS SYSTEM	140672
+DISEASES AND DISORDERS OF THE KIDNEY AND URINARY TRACT	90651
+MENTAL DISEASES AND DISORDERS	90314
+ENDOCRINE, NUTRITIONAL AND METABOLIC DISEASES AND DISORDERS	76463
+DISEASES AND DISORDERS OF THE HEPATOBILIARY SYSTEM AND PANCREAS	60918
+ALCOHOL/DRUG USE AND ALCOHOL/DRUG INDUCED ORGANIC MENTAL DISORDERS	57343
+DISEASES AND DISORDERS OF THE SKIN, SUBCUTANEOUS TISSUE AND BREAST	43969
+DISEASES AND DISORDERS OF THE BLOOD AND BLOOD FORMING ORGANS AND IMMUNOLOGICAL DISORDERS	28933
+INJURIES, POISONINGS AND TOXIC EFFECTS OF DRUGS	25824
+FACTORS INFLUENCING HEALTH STATUS AND OTHER CONTACTS WITH HEALTH SERVICES	25458
+MYELOPROLIFERATIVE DISEASES AND DISORDERS, AND POORLY DIFFERENTIATED NEOPLASM	20745
+DISEASES AND DISORDERS OF THE EAR, NOSE, MOUTH AND THROAT	20505
+DISEASES AND DISORDERS OF THE FEMALE REPRODUCTIVE SYSTEM	17762
+DISEASES AND DISORDERS OF THE MALE REPRODUCTIVE SYSTEM	8581
+HUMAN IMMUNODEFICIENCY VIRUS INFECTIONS	5629
+MULTIPLE SIGNIFICANT TRAUMA	5214
+DISEASES AND DISORDERS OF THE EYE	3371
+BURNS	1831
+PRE MDC	444
+
+& "C:\useApp\Python\myVenv\BigData\Scripts\python.exe" -m flask --app src.app run --host 0.0.0.0 --port 5000
+
+cd web
+npm run dev -- --port 3000
