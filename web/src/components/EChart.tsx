@@ -18,13 +18,24 @@ export function EChart({ option, className = "chart", onClick }: { option: EChar
     const handleClick = (params: unknown) => clickHandlerRef.current?.(params);
     chart.on("click", handleClick);
     let disposed = false;
+    let resizeFrame: number | undefined;
     const observer = new ResizeObserver(() => {
-      if (!disposed && !chart.isDisposed()) chart.resize();
+      window.cancelAnimationFrame(resizeFrame ?? 0);
+      resizeFrame = window.requestAnimationFrame(() => {
+        if (disposed || echarts.getInstanceByDom(element) !== chart) return;
+        try {
+          chart.resize();
+        } catch {
+          // ECharts can release its internal model between observer scheduling
+          // and this frame while a modal chart is being unmounted.
+        }
+      });
     });
     observer.observe(element);
     return () => {
       disposed = true;
       observer.disconnect();
+      window.cancelAnimationFrame(resizeFrame ?? 0);
       chart.off("click", handleClick);
       if (!chart.isDisposed()) chart.dispose();
     };
