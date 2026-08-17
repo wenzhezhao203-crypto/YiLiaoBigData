@@ -1,0 +1,89 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { EChartsOption } from "echarts";
+import { Building2, CalendarDays, CircleDollarSign, Coins, Gauge, HeartPulse, Hospital, RotateCcw, UsersRound } from "lucide-react";
+import { EChart } from "@/components/EChart";
+import { DiseaseDrilldown } from "@/components/DiseaseDrilldown";
+import { Panel, State } from "@/components/Panel";
+import { dashboardApi } from "@/lib/api";
+import { days, money, number, percent } from "@/lib/format";
+import type { AdmissionItem, AgeGenderItem, DashboardFilters, DiseaseItem, DispositionItem, HospitalItem, HospitalPage, KpiData, PaymentItem, SeverityItem } from "@/lib/types";
+
+type DashboardData = { age: AgeGenderItem[]; payment: PaymentItem[]; disposition: DispositionItem[]; admission: AdmissionItem[]; kpi: KpiData; resources: HospitalItem[]; ranking: HospitalItem[]; comparison: HospitalPage; systems: DiseaseItem[]; diagnoses: DiseaseItem[]; severity: SeverityItem[]; updatedAt?: string | null };
+const axis = { axisLine: { lineStyle: { color: "#36506c" } }, axisLabel: { color: "#9eb7cc", fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(83,117,147,.18)" } } };
+const tooltip = { trigger: "axis", backgroundColor: "#061725", borderColor: "#206b95", textStyle: { color: "#e8f5ff" } } as const;
+type SystemChartPoint = { value: number; code: string; description: string };
+
+function chartOption(option: EChartsOption): EChartsOption { return option; }
+
+export function Dashboard() {
+  const [filters, setFilters] = useState<DashboardFilters>({});
+  const [areas, setAreas] = useState<string[]>([]); const [counties, setCounties] = useState<string[]>([]); const [facilities, setFacilities] = useState<string[]>([]);
+  const [data, setData] = useState<DashboardData>(); const [loading, setLoading] = useState(true); const [error, setError] = useState<string>(); const [page, setPage] = useState(1); const [rankingBy, setRankingBy] = useState("discharge_count");
+  const requestRef = useRef<AbortController | undefined>(undefined);
+  useEffect(() => { dashboardApi.areas().then(r => setAreas(r.data.map(x => x.hospital_service_area))).catch(() => setError("无法连接后端服务")); }, []);
+  useEffect(() => { if (!filters.hospital_service_area) return setCounties([]); dashboardApi.counties(filters.hospital_service_area).then(r => setCounties(r.data.map(x => x.hospital_county))); }, [filters.hospital_service_area]);
+  useEffect(() => { if (!filters.hospital_county) return setFacilities([]); dashboardApi.facilities({ hospital_service_area: filters.hospital_service_area, hospital_county: filters.hospital_county }).then(r => setFacilities(r.data.map(x => x.facility_name))); }, [filters.hospital_service_area, filters.hospital_county]);
+  useEffect(() => {
+    requestRef.current?.abort(); const controller = new AbortController(); requestRef.current = controller; setLoading(true); setError(undefined);
+    Promise.allSettled([dashboardApi.ageGender(filters, controller.signal), dashboardApi.payment(filters, controller.signal), dashboardApi.disposition(filters, controller.signal), dashboardApi.admission(filters, controller.signal), dashboardApi.kpi(filters, controller.signal), dashboardApi.resources(filters, controller.signal), dashboardApi.ranking(filters, rankingBy, controller.signal), dashboardApi.comparison(filters, page, controller.signal), dashboardApi.systems(filters, controller.signal), dashboardApi.diagnoses(filters, controller.signal), dashboardApi.severity(filters, controller.signal)])
+      .then((results) => {
+        if (controller.signal.aborted) return;
+        const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+        if (failed) throw failed.reason;
+        const [age, payment, disposition, admission, kpi, resources, ranking, comparison, systems, diagnoses, severity] = results.map(result => (result as PromiseFulfilledResult<unknown>).value) as [Awaited<ReturnType<typeof dashboardApi.ageGender>>, Awaited<ReturnType<typeof dashboardApi.payment>>, Awaited<ReturnType<typeof dashboardApi.disposition>>, Awaited<ReturnType<typeof dashboardApi.admission>>, Awaited<ReturnType<typeof dashboardApi.kpi>>, Awaited<ReturnType<typeof dashboardApi.resources>>, Awaited<ReturnType<typeof dashboardApi.ranking>>, Awaited<ReturnType<typeof dashboardApi.comparison>>, Awaited<ReturnType<typeof dashboardApi.systems>>, Awaited<ReturnType<typeof dashboardApi.diagnoses>>, Awaited<ReturnType<typeof dashboardApi.severity>>];
+        setData({ age: age.data, payment: payment.data, disposition: disposition.data, admission: admission.data, kpi: kpi.data, resources: resources.data, ranking: ranking.data, comparison: comparison.data, systems: systems.data, diagnoses: diagnoses.data, severity: severity.data, updatedAt: kpi.updated_at });
+      })
+      .catch((e) => { if (e.name !== "AbortError" && !controller.signal.aborted) setError(e.message || "数据加载失败"); })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [filters, page, rankingBy]);
+
+  const changeArea = (value: string) => { setPage(1); setFilters(value ? { hospital_service_area: value } : {}); };
+  const changeCounty = (value: string) => { setPage(1); setFilters(current => ({ hospital_service_area: current.hospital_service_area, hospital_county: value || undefined })); };
+  const changeFacility = (value: string) => { setPage(1); setFilters(current => ({ ...current, facility_name: value || undefined })); };
+  const ageOption = useMemo(() => {
+    const groups = [...new Map((data?.age ?? []).map(item => [item.age_group, item.age_group_sort])).entries()]
+      .sort(([, firstSort], [, secondSort]) => (firstSort ?? Number.MAX_SAFE_INTEGER) - (secondSort ?? Number.MAX_SAFE_INTEGER))
+      .map(([group]) => group);
+    return chartOption({ tooltip, legend: { data: ["M", "F"], textStyle: { color: "#b7d1e8" }, right: 0 }, grid: { top: 30, right: 12, bottom: 22, left: 36 }, xAxis: { ...axis, type: "category", data: groups, axisLabel: { ...axis.axisLabel, interval: 0 } }, yAxis: { ...axis, type: "value" }, series: ["M", "F"].map((gender, index) => ({ name: gender === "M" ? "男" : "女", type: "bar", stack: "total", barMaxWidth: 26, itemStyle: { color: index ? "#f59e0b" : "#3b82f6" }, data: groups.map(group => data?.age.find(item => item.age_group === group && item.gender === gender)?.discharge_count ?? 0) })) });
+  }, [data?.age]);
+  const paymentOption = useMemo(() => {
+    const categories = ["Medicare", "Medicaid", "Blue Cross/Blue Shield", "Private Health Insurance", "Other"] as const;
+    const grouped = new Map<string, number>(categories.map(category => [category, 0]));
+    (data?.payment ?? []).forEach((item) => {
+      const source = item.payment_typology_1.trim().toLowerCase();
+      const category = source === "medicare" ? "Medicare"
+        : source === "medicaid" ? "Medicaid"
+          : source === "blue cross/blue shield" ? "Blue Cross/Blue Shield"
+            : source === "private health insurance" ? "Private Health Insurance"
+              : "Other";
+      grouped.set(category, (grouped.get(category) ?? 0) + item.discharge_count);
+    });
+    return chartOption({ tooltip: { trigger: "item", formatter: "{b}<br/>{c} 人 ({d}%)" }, color: ["#3b82f6", "#22b8cf", "#f59e0b", "#34d399", "#94a3b8"], legend: { orient: "vertical", right: 4, top: "middle", textStyle: { color: "#c4d8ea", fontSize: 10 } }, series: [{ type: "pie", radius: ["48%", "72%"], center: ["30%", "50%"], label: { show: false }, data: categories.map(category => ({ name: category, value: grouped.get(category) ?? 0 })) }] });
+  }, [data?.payment]);
+  const dispositionOption = useMemo(() => chartOption({ tooltip, grid: { top: 8, right: 20, bottom: 18, left: 130 }, xAxis: { ...axis, type: "value" }, yAxis: { ...axis, type: "category", inverse: true, data: (data?.disposition ?? []).map(x => x.patient_disposition), axisLabel: { ...axis.axisLabel, width: 118, overflow: "truncate" } }, series: [{ type: "bar", data: (data?.disposition ?? []).map(x => x.discharge_count), itemStyle: { color: "#4f93ff" }, barMaxWidth: 14 }] }), [data?.disposition]);
+  const admissionOption = useMemo(() => { const labels = [...new Set((data?.admission ?? []).map(x => x.type_of_admission))]; const emergency = (data?.admission ?? []).filter(x => x.emergency_department_indicator === "Y"); const nonEmergency = (data?.admission ?? []).filter(x => x.emergency_department_indicator !== "Y"); return chartOption({ tooltip, legend: { data: ["急诊 Y", "非急诊/未知"], textStyle: { color: "#b7d1e8" }, top: 0, right: 6, itemWidth: 26, itemGap: 10 }, grid: { top: 34, right: 10, bottom: 25, left: 36 }, xAxis: { ...axis, type: "category", data: labels }, yAxis: { ...axis, type: "value" }, series: [{ name: "急诊 Y", type: "bar", stack: "all", itemStyle: { color: "#3b82f6" }, data: labels.map(l => emergency.find(x => x.type_of_admission === l)?.discharge_count ?? 0) }, { name: "非急诊/未知", type: "bar", stack: "all", itemStyle: { color: "#22b8cf" }, data: labels.map(l => nonEmergency.filter(x => x.type_of_admission === l).reduce((sum, x) => sum + x.discharge_count, 0)) }] }); }, [data?.admission]);
+  const systemsOption = useMemo(() => {
+    const points: SystemChartPoint[] = (data?.systems ?? []).slice(0, 10).map(item => ({ value: item.discharge_count, code: item.apr_mdc_code ?? "", description: item.apr_mdc_description ?? "暂无描述" }));
+    return chartOption({ tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, formatter: (params) => { const current = Array.isArray(params) ? params[0] : params; const point = current?.data as SystemChartPoint; return `${point.code}<br/>${point.description}<br/>出院记录数：${number(point.value)}`; } }, grid: { top: 8, right: 14, bottom: 28, left: 38, containLabel: true }, xAxis: { ...axis, type: "category", data: points.map(point => point.code), axisLabel: { ...axis.axisLabel, interval: 0 } }, yAxis: { ...axis, type: "value" }, series: [{ type: "bar", data: points, itemStyle: { color: "#4f93ff" }, barMaxWidth: 28 }] });
+  }, [data?.systems]);
+  const diagnosesOption = useMemo(() => chartOption({ tooltip, grid: { top: 8, right: 15, bottom: 16, left: 116 }, xAxis: { ...axis, type: "value" }, yAxis: { ...axis, type: "category", inverse: true, data: (data?.diagnoses ?? []).map(x => x.ccsr_diagnosis_description ?? ""), axisLabel: { ...axis.axisLabel, width: 105, overflow: "truncate" } }, series: [{ type: "bar", data: (data?.diagnoses ?? []).map(x => x.discharge_count), itemStyle: { color: "#4f93ff" }, barMaxWidth: 13 }] }), [data?.diagnoses]);
+  const severityOption = useMemo(() => chartOption({ tooltip, grid: { top: 10, right: 12, bottom: 25, left: 36 }, xAxis: { ...axis, type: "category", data: (data?.severity ?? []).map(x => x.apr_severity_description) }, yAxis: { ...axis, type: "value" }, series: [{ type: "bar", data: (data?.severity ?? []).map(x => x.discharge_count), itemStyle: { color: (p: { dataIndex: number }) => ["#39c98d", "#f6c344", "#f59e0b", "#ef5b5b"][p.dataIndex] }, barMaxWidth: 34, label: { show: true, position: "top", color: "#dff0ff", fontSize: 10 } }] }), [data?.severity]);
+  const bubbleOption = useMemo(() => chartOption({ tooltip: { trigger: "item" }, grid: { top: 20, right: 20, bottom: 30, left: 45 }, xAxis: { ...axis, type: "value", name: "出院量", nameTextStyle: { color: "#9eb7cc" } }, yAxis: { ...axis, type: "value", name: "平均成本", nameTextStyle: { color: "#9eb7cc" } }, visualMap: { min: 2, max: 10, dimension: 2, right: 0, top: 25, textStyle: { color: "#bfd2e2" }, inRange: { color: ["#3b82f6", "#22d3ee", "#f59e0b"] } }, series: [{ type: "scatter", data: (data?.resources ?? []).map(x => [x.discharge_count, x.average_cost ?? 0, x.average_length_of_stay ?? 0, x.facility_name]), symbolSize: (v: number[]) => Math.max(10, Math.min(42, Math.sqrt(v[0]) / 5)), itemStyle: { opacity: .85 } }] }), [data?.resources]);
+  const rankingOption = useMemo(() => chartOption({ tooltip, grid: { top: 8, right: 14, bottom: 17, left: 130 }, xAxis: { ...axis, type: "value" }, yAxis: { ...axis, type: "category", inverse: true, data: (data?.ranking ?? []).map(x => x.facility_name), axisLabel: { ...axis.axisLabel, width: 122, overflow: "truncate" } }, series: [{ type: "bar", data: (data?.ranking ?? []).map(x => x.discharge_count), itemStyle: { color: "#4f93ff" }, barMaxWidth: 12 }] }), [data?.ranking]);
+
+  const kpis = data?.kpi ? [{ label: "医院数", value: number(data.kpi.hospital_count), icon: Building2, tone: "blue" }, { label: "出院量", value: number(data.kpi.discharge_count), icon: UsersRound, tone: "blue" }, { label: "平均住院天数", value: days(data.kpi.average_length_of_stay), icon: CalendarDays, tone: "cyan" }, { label: "总收费", value: money(data.kpi.total_charges), icon: CircleDollarSign, tone: "gold" }, { label: "总成本", value: money(data.kpi.total_costs), icon: Coins, tone: "cyan" }, { label: "平均收费", value: money(data.kpi.average_charge), icon: CircleDollarSign, tone: "gold" }, { label: "平均成本", value: money(data.kpi.average_cost), icon: Gauge, tone: "cyan" }, { label: "急诊占比", value: percent(data.kpi.emergency_ratio), icon: HeartPulse, tone: "orange" }] : [];
+  const table = data?.comparison;
+  return <main className="dashboard-shell">
+    <header className="topbar"><div className="brand"><Hospital size={28}/><div><small>MEDICAL INTELLIGENCE</small><h1>智慧医疗住院数据分析平台</h1></div></div><div className="updated">数据更新：{data?.updatedAt ? new Date(data.updatedAt).toLocaleString("zh-CN") : "--"}</div></header>
+    <div className="filterbar"><label>医院服务区域<select value={filters.hospital_service_area ?? ""} onChange={e => changeArea(e.target.value)}><option value="">全部区域</option>{areas.map(x => <option key={x}>{x}</option>)}</select></label><label>医院所在县<select value={filters.hospital_county ?? ""} onChange={e => changeCounty(e.target.value)} disabled={!filters.hospital_service_area}><option value="">全部县</option>{counties.map(x => <option key={x}>{x}</option>)}</select></label><label>医疗机构名称<select value={filters.facility_name ?? ""} onChange={e => changeFacility(e.target.value)} disabled={!filters.hospital_county}><option value="">全部医院</option>{facilities.map(x => <option key={x}>{x}</option>)}</select></label><button className="reset" title="重置筛选" onClick={() => changeArea("")}><RotateCcw size={17}/></button></div>
+    {error && <div className="connection-error">{error}。请确认 Flask 服务正在运行于 http://127.0.0.1:5000。</div>}
+    <div className="dashboard-grid">
+      <aside className="column left-column"><h2 className="column-title">患者分析</h2><Panel title="年龄与性别结构">{loading ? <State>加载中...</State> : <EChart option={ageOption}/>}</Panel><Panel title="支付方式分布">{loading ? <State>加载中...</State> : <EChart option={paymentOption}/>}</Panel><Panel title="离院去向 Top 10">{loading ? <State>加载中...</State> : <EChart option={dispositionOption}/>}</Panel><Panel title="入院与急诊结构">{loading ? <State>加载中...</State> : <EChart option={admissionOption}/>}</Panel></aside>
+      <section className="column center-column"><h2 className="column-title">医院运营分析</h2><div className="kpi-grid">{kpis.map(({ label, value, icon: Icon, tone }) => <article className={`kpi ${tone}`} key={label}><Icon size={21}/><span>{label}</span><strong>{value}</strong></article>)}</div><div className="center-charts"><Panel title="医院资源与成本"><EChart option={bubbleOption}/></Panel><Panel title="医院运营排名" action={<select className="mini-select" value={rankingBy} onChange={e => setRankingBy(e.target.value)}><option value="discharge_count">按出院量</option><option value="total_charges">按总收费</option><option value="average_cost">按平均成本</option><option value="average_length_of_stay">按住院天数</option></select>}><EChart option={rankingOption}/></Panel></div><Panel title="医院对比表"><div className="table-wrap"><table suppressHydrationWarning><thead><tr><th>医院名称</th><th>所在县</th><th>出院量</th><th>平均住院天数</th><th>总收费</th><th>总成本</th><th>急诊占比</th></tr></thead><tbody>{table?.items.map(row => <tr key={row.facility_name}><td>{row.facility_name}</td><td>{row.hospital_county}</td><td>{number(row.discharge_count)}</td><td>{days(row.average_length_of_stay)}</td><td>{money(row.total_charges)}</td><td>{money(row.total_costs)}</td><td>{percent(row.emergency_ratio)}</td></tr>)}</tbody></table></div><div className="pagination"><span>共 {table?.total ?? 0} 家</span><button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>上一页</button><b>{page}</b><button disabled={!table || page * table.page_size >= table.total} onClick={() => setPage(p => p + 1)}>下一页</button></div></Panel></section>
+      <aside className="column right-column"><h2 className="column-title">疾病与严重程度</h2><Panel title="疾病系统分布 (APR MDC)">{loading ? <State>加载中...</State> : <EChart className="chart disease-system-chart" option={systemsOption}/>}</Panel><Panel title="高发疾病 Top 10 (CCSR)">{loading ? <State>加载中...</State> : <EChart option={diagnosesOption}/>}</Panel><Panel title="病情严重程度分布">{loading ? <State>加载中...</State> : <EChart option={severityOption}/>}</Panel><DiseaseDrilldown filters={filters}/></aside>
+    </div>
+  </main>;
+}
