@@ -22,6 +22,7 @@ import { dashboardApi } from "@/lib/api";
 import { days, money, number, percent } from "@/lib/format";
 import type {
   AdmissionItem,
+  MedicalSurgicalItem,
   AgeGenderItem,
   DashboardFilters,
   DiseaseItem,
@@ -38,6 +39,7 @@ type DashboardData = {
   payment: PaymentItem[];
   disposition: DispositionItem[];
   admission: AdmissionItem[];
+  medicalSurgical: MedicalSurgicalItem[];
   kpi: KpiData;
   resources: HospitalItem[];
   ranking: HospitalItem[];
@@ -84,6 +86,7 @@ export function Dashboard() {
   const [page, setPage] = useState(1);
   const [rankingBy, setRankingBy] = useState("discharge_count");
   const [hospitalKeyword, setHospitalKeyword] = useState("");
+  const [patientStructureView, setPatientStructureView] = useState<"admission" | "medicalSurgical">("admission");
   const requestRef = useRef<AbortController | undefined>(undefined);
   useEffect(() => {
     dashboardApi
@@ -117,6 +120,7 @@ export function Dashboard() {
       dashboardApi.payment(filters, controller.signal),
       dashboardApi.disposition(filters, controller.signal),
       dashboardApi.admission(filters, controller.signal),
+      dashboardApi.medicalSurgical(filters, controller.signal),
       dashboardApi.kpi(filters, controller.signal),
       dashboardApi.resources(filters, controller.signal),
       dashboardApi.ranking(filters, rankingBy, controller.signal),
@@ -142,6 +146,7 @@ export function Dashboard() {
           payment,
           disposition,
           admission,
+          medicalSurgical,
           kpi,
           resources,
           ranking,
@@ -156,6 +161,7 @@ export function Dashboard() {
           Awaited<ReturnType<typeof dashboardApi.payment>>,
           Awaited<ReturnType<typeof dashboardApi.disposition>>,
           Awaited<ReturnType<typeof dashboardApi.admission>>,
+          Awaited<ReturnType<typeof dashboardApi.medicalSurgical>>,
           Awaited<ReturnType<typeof dashboardApi.kpi>>,
           Awaited<ReturnType<typeof dashboardApi.resources>>,
           Awaited<ReturnType<typeof dashboardApi.ranking>>,
@@ -169,6 +175,7 @@ export function Dashboard() {
           payment: payment.data,
           disposition: disposition.data,
           admission: admission.data,
+          medicalSurgical: medicalSurgical.data,
           kpi: kpi.data,
           resources: resources.data,
           ranking: ranking.data,
@@ -367,6 +374,61 @@ export function Dashboard() {
       ],
     });
   }, [data?.admission]);
+  const medicalSurgicalOption = useMemo(() => {
+    const items = data?.medicalSurgical ?? [];
+    const barData = items.map((item) => ({
+      ...item,
+      value: item.discharge_count,
+    }));
+    const displayName = (value: string) =>
+      value === "Medical" ? "内科" : value === "Surgical" ? "外科" : value;
+    return chartOption({
+      tooltip: {
+        trigger: "item",
+        confine: true,
+        backgroundColor: "#061725",
+        borderColor: "#2a91c8",
+        borderWidth: 1,
+        textStyle: { color: "#e8f5ff" },
+        formatter: (params: unknown) => {
+          const item = (params as { data?: MedicalSurgicalItem }).data;
+          if (!item) return "";
+          return `<div style="min-width:152px"><b style="color:#71d1f4">${displayName(item.apr_medical_surgical_description)}</b><br/>出院量：<b>${number(item.discharge_count)}</b><br/>占比：<b>${percent(item.discharge_ratio)}</b><br/>平均住院天数：<b>${days(item.average_length_of_stay)}</b><br/>平均收费：<b>${money(item.average_charge)}</b><br/>平均成本：<b>${money(item.average_cost)}</b></div>`;
+        },
+      },
+      grid: { top: 20, right: 14, bottom: 25, left: 40 },
+      xAxis: {
+        ...axis,
+        type: "category",
+        data: items.map((item) => displayName(item.apr_medical_surgical_description)),
+      },
+      yAxis: { ...axis, type: "value" },
+      series: [
+        {
+          type: "bar",
+          barMaxWidth: 54,
+          label: {
+            show: true,
+            position: "top",
+            color: "#dff0ff",
+            fontSize: 10,
+            formatter: (params: unknown) =>
+              percent(
+                (params as { data?: MedicalSurgicalItem }).data
+                  ?.discharge_ratio ?? null,
+              ),
+          },
+          data: barData,
+          itemStyle: {
+            color: (params: { dataIndex: number }) =>
+              items[params.dataIndex]?.apr_medical_surgical_description === "Medical"
+                ? "#3b82f6"
+                : "#36c5c9",
+          },
+        },
+      ],
+    });
+  }, [data?.medicalSurgical]);
   const systemsOption = useMemo(() => {
     const points: SystemChartPoint[] = (data?.systems ?? [])
       .slice(0, 10)
@@ -700,11 +762,35 @@ export function Dashboard() {
                 <EChart option={dispositionOption} />
               )}
             </Panel>
-            <Panel title="入院与急诊结构">
+            <Panel
+              title={patientStructureView === "admission" ? "入院与急诊结构" : "内科与外科结构"}
+              action={
+                <div className="structure-switch" role="group" aria-label="患者结构视图">
+                  <button
+                    className={patientStructureView === "admission" ? "active" : ""}
+                    onClick={() => setPatientStructureView("admission")}
+                  >
+                    入院急诊
+                  </button>
+                  <button
+                    className={patientStructureView === "medicalSurgical" ? "active" : ""}
+                    onClick={() => setPatientStructureView("medicalSurgical")}
+                  >
+                    内科外科
+                  </button>
+                </div>
+              }
+            >
               {loading ? (
                 <State>加载中...</State>
               ) : (
-                <EChart option={admissionOption} />
+                <EChart
+                  option={
+                    patientStructureView === "admission"
+                      ? admissionOption
+                      : medicalSurgicalOption
+                  }
+                />
               )}
             </Panel>
           </aside>

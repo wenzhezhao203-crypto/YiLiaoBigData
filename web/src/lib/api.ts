@@ -1,4 +1,4 @@
-import type { ApiResponse, DashboardFilters, DrilldownResponse, AgeGenderItem, PaymentItem, DispositionItem, AdmissionItem, KpiData, HospitalItem, HospitalPage, DiseaseItem, SeverityItem } from "@/lib/types";
+import type { ApiResponse, DashboardFilters, DrilldownResponse, AgeGenderItem, PaymentItem, DispositionItem, AdmissionItem, MedicalSurgicalItem, KpiData, HospitalItem, HospitalPage, DiseaseItem, SeverityItem } from "@/lib/types";
 
 // Requests go through the Next.js rewrite so the browser only calls its own origin.
 // This avoids cross-origin and private-network restrictions on localhost deployments.
@@ -44,6 +44,7 @@ export const dashboardApi = {
   payment: (filters: DashboardFilters, signal?: AbortSignal) => request<PaymentItem[]>("/dashboard/patient/payment", filters, {}, signal),
   disposition: (filters: DashboardFilters, signal?: AbortSignal) => request<DispositionItem[]>("/dashboard/patient/disposition", filters, { limit: 10 }, signal),
   admission: (filters: DashboardFilters, signal?: AbortSignal) => request<AdmissionItem[]>("/dashboard/patient/admission-emergency", filters, {}, signal),
+  medicalSurgical: (filters: DashboardFilters, signal?: AbortSignal) => request<MedicalSurgicalItem[]>("/dashboard/patient/medical-surgical", filters, {}, signal),
   kpi: (filters: DashboardFilters, signal?: AbortSignal) => request<KpiData>("/dashboard/kpi", filters, {}, signal),
   resources: (filters: DashboardFilters, signal?: AbortSignal) => request<HospitalItem[]>("/dashboard/hospital/resources", filters, {}, signal),
   ranking: (filters: DashboardFilters, sortBy = "discharge_count", signal?: AbortSignal) => request<HospitalItem[]>("/dashboard/hospital/ranking", filters, { sort_by: sortBy, order: "desc", limit: 10 }, signal),
