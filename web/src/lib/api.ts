@@ -47,7 +47,7 @@ export const dashboardApi = {
   kpi: (filters: DashboardFilters, signal?: AbortSignal) => request<KpiData>("/dashboard/kpi", filters, {}, signal),
   resources: (filters: DashboardFilters, signal?: AbortSignal) => request<HospitalItem[]>("/dashboard/hospital/resources", filters, {}, signal),
   ranking: (filters: DashboardFilters, sortBy = "discharge_count", signal?: AbortSignal) => request<HospitalItem[]>("/dashboard/hospital/ranking", filters, { sort_by: sortBy, order: "desc", limit: 10 }, signal),
-  comparison: (filters: DashboardFilters, page = 1, signal?: AbortSignal) => request<HospitalPage>("/dashboard/hospital/comparison", filters, { page, page_size: 10, sort_by: "discharge_count", order: "desc" }, signal),
+  comparison: (filters: DashboardFilters, page = 1, keyword?: string, signal?: AbortSignal) => request<HospitalPage>("/dashboard/hospital/comparison", filters, { page, page_size: 10, sort_by: "discharge_count", order: "desc", keyword }, signal),
   systems: (filters: DashboardFilters, signal?: AbortSignal) => request<DiseaseItem[]>("/dashboard/disease/systems", filters, {}, signal),
   diagnoses: (filters: DashboardFilters, signal?: AbortSignal) => request<DiseaseItem[]>("/dashboard/disease/top-diagnoses", filters, { limit: 10 }, signal),
   severity: (filters: DashboardFilters, signal?: AbortSignal) => request<SeverityItem[]>("/dashboard/disease/risk", filters, {}, signal),
