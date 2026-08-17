@@ -407,7 +407,13 @@ export function Dashboard() {
   const diagnosesOption = useMemo(
     () =>
       chartOption({
-        tooltip: { ...tooltip, trigger: "item", confine: true },
+        tooltip: {
+          ...tooltip,
+          trigger: "item",
+          confine: true,
+          extraCssText:
+            "max-width:230px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;",
+        },
         grid: { top: 8, right: 15, bottom: 16, left: 116 },
         xAxis: { ...axis, type: "value" },
         yAxis: {
