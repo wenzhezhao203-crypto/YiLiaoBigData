@@ -21,6 +21,59 @@ function renderInline(text: string): ReactNode[] {
   );
 }
 
+type PipeTable = {
+  intro: string;
+  headers: string[];
+  rows: string[][];
+  conclusion: string;
+};
+
+function parseFlattenedPipeTable(line: string): PipeTable | null {
+  if (!line.includes("|")) return null;
+
+  const cells = line.split("|").map(cell => cell.trim()).filter(Boolean);
+  const separatorIndex = cells.findIndex(cell => /^:?-{3,}:?$/.test(cell));
+  if (separatorIndex < 0) return null;
+
+  const headerStart = separatorIndex >= 3 ? separatorIndex - 3 : separatorIndex;
+  let intro = cells.slice(0, headerStart).join(" ").replace(/[：:]$/, "");
+  const headers = cells.slice(headerStart, separatorIndex);
+  if (headers.length !== 3) {
+    headers.splice(0, headers.length, "支付方式", "出院人次", "占比");
+  }
+  const titleSeparator = Math.max(headers[0].lastIndexOf("："), headers[0].lastIndexOf(":"));
+  if (titleSeparator >= 0) {
+    intro = [intro, headers[0].slice(0, titleSeparator)].filter(Boolean).join(" ");
+    headers[0] = headers[0].slice(titleSeparator + 1).trim() || "支付方式";
+  }
+  const dataStart = cells.findIndex((cell, index) => index >= separatorIndex && !/^:?-{3,}:?$/.test(cell));
+  if (dataStart < 0) return null;
+
+  const data = cells.slice(dataStart);
+  const rows: string[][] = [];
+  let position = 0;
+  while (position + 2 < data.length && /^\d[\d,]*(?:\.\d+)?$/.test(data[position + 1]) && /^\d+(?:\.\d+)?%$/.test(data[position + 2])) {
+    rows.push(data.slice(position, position + 3));
+    position += 3;
+  }
+  if (!rows.length) return null;
+
+  return { intro, headers, rows, conclusion: data.slice(position).join(" ") };
+}
+
+function renderPipeTable(table: PipeTable, key: number) {
+  return <section className="agent-data-table" key={key}>
+    {table.intro && <p className="agent-table-intro">{renderInline(table.intro)}</p>}
+    <div className="agent-table-row agent-table-heading" role="row">
+      {table.headers.map((header, headerIndex) => <span role="columnheader" key={headerIndex}>{header}</span>)}
+    </div>
+    {table.rows.map((row, rowIndex) => <div className="agent-table-row" role="row" key={rowIndex}>
+      {row.map((cell, cellIndex) => <span role="cell" key={cellIndex}>{cell}</span>)}
+    </div>)}
+    {table.conclusion && <p className="agent-table-conclusion">{renderInline(table.conclusion)}</p>}
+  </section>;
+}
+
 function renderAssistantContent(content: string) {
   const lines = content.replace(/\r/g, "").split("\n");
   const blocks: ReactNode[] = [];
@@ -29,6 +82,12 @@ function renderAssistantContent(content: string) {
   while (index < lines.length) {
     const line = lines[index].trim();
     if (!line) {
+      index += 1;
+      continue;
+    }
+    const pipeTable = parseFlattenedPipeTable(line);
+    if (pipeTable) {
+      blocks.push(renderPipeTable(pipeTable, index));
       index += 1;
       continue;
     }
