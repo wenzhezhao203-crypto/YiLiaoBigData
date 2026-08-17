@@ -377,8 +377,8 @@ export function Dashboard() {
       }));
     return chartOption({
       tooltip: {
-        trigger: "axis",
-        axisPointer: { type: "shadow" },
+        trigger: "item",
+        confine: true,
         formatter: (params) => {
           const current = Array.isArray(params) ? params[0] : params;
           const point = current?.data as SystemChartPoint;
@@ -406,7 +406,7 @@ export function Dashboard() {
   const diagnosesOption = useMemo(
     () =>
       chartOption({
-        tooltip,
+        tooltip: { ...tooltip, trigger: "item", confine: true },
         grid: { top: 8, right: 15, bottom: 16, left: 116 },
         xAxis: { ...axis, type: "value" },
         yAxis: {
