@@ -17,7 +17,7 @@ const LEVEL_LABELS: Record<DrillLevel, string> = { mdc: "疾病系统（MDC）",
 function buildBubbleOption(items: DrilldownItem[], level: DrillLevel): EChartsOption {
   const largest = Math.max(...items.map(item => item.discharge_count), 1);
   const nodes: BubbleNode[] = items.map(item => ({
-    name: item.description || item.code,
+    name: item.code,
     code: item.code,
     description: item.description || "暂无描述",
     dischargeCount: item.discharge_count,
@@ -37,11 +37,12 @@ function buildBubbleOption(items: DrilldownItem[], level: DrillLevel): EChartsOp
         return `<div style="font-weight:700;color:#74d7f4;margin-bottom:6px">${node.code}</div><div style="max-width:280px;margin-bottom:7px">${node.description}</div><div>出院量：<b>${number(node.dischargeCount)}</b></div><div>平均住院天数：<b>${days(node.averageLengthOfStay)}</b></div><div>总收费：<b>${money(node.totalCharges)}</b></div><div>总成本：<b>${money(node.totalCosts)}</b></div>`;
       },
     },
+    animationDuration: 850, animationDurationUpdate: 900, animationEasingUpdate: "cubicInOut",
     series: [{
       type: "graph", layout: "force", data: nodes, links: [], roam: true, draggable: false, cursor: level === "ccsr" ? "default" : "pointer",
-      label: { show: false }, itemStyle: { color: (params: { dataIndex: number }) => colors[params.dataIndex % colors.length], opacity: .88, borderColor: "rgba(223,248,255,.7)", borderWidth: 1 },
+      label: { show: true, position: "inside", color: "#f8fdff", fontSize: 11, fontWeight: 700, formatter: "{b}", textBorderColor: "rgba(1, 24, 39, .65)", textBorderWidth: 2 }, itemStyle: { color: (params: { dataIndex: number }) => colors[params.dataIndex % colors.length], opacity: .88, borderColor: "rgba(223,248,255,.7)", borderWidth: 1 },
       emphasis: { scale: true, itemStyle: { borderColor: "#f2fbff", borderWidth: 2 } },
-      force: { repulsion: 240, gravity: .05, edgeLength: 34 },
+      force: { repulsion: 105, gravity: .32, edgeLength: 20, friction: .48, layoutAnimation: true },
     }],
   };
 }
