@@ -9,10 +9,12 @@ import {
   Coins,
   Gauge,
   HeartPulse,
+  Expand,
   Hospital,
   RotateCcw,
   Search,
   UsersRound,
+  X,
 } from "lucide-react";
 import { EChart } from "@/components/EChart";
 import { AgentSidebar } from "@/components/AgentSidebar";
@@ -39,7 +41,6 @@ type DashboardData = {
   payment: PaymentItem[];
   disposition: DispositionItem[];
   admission: AdmissionItem[];
-  medicalSurgical: MedicalSurgicalItem[];
   kpi: KpiData;
   resources: HospitalItem[];
   ranking: HospitalItem[];
@@ -87,6 +88,9 @@ export function Dashboard() {
   const [rankingBy, setRankingBy] = useState("discharge_count");
   const [hospitalKeyword, setHospitalKeyword] = useState("");
   const [patientStructureView, setPatientStructureView] = useState<"admission" | "medicalSurgical">("admission");
+  const [resourceModalOpen, setResourceModalOpen] = useState(false);
+  const [medicalSurgical, setMedicalSurgical] = useState<MedicalSurgicalItem[]>();
+  const [medicalSurgicalLoading, setMedicalSurgicalLoading] = useState(false);
   const requestRef = useRef<AbortController | undefined>(undefined);
   useEffect(() => {
     dashboardApi
@@ -120,7 +124,6 @@ export function Dashboard() {
       dashboardApi.payment(filters, controller.signal),
       dashboardApi.disposition(filters, controller.signal),
       dashboardApi.admission(filters, controller.signal),
-      dashboardApi.medicalSurgical(filters, controller.signal),
       dashboardApi.kpi(filters, controller.signal),
       dashboardApi.resources(filters, controller.signal),
       dashboardApi.ranking(filters, rankingBy, controller.signal),
@@ -146,7 +149,6 @@ export function Dashboard() {
           payment,
           disposition,
           admission,
-          medicalSurgical,
           kpi,
           resources,
           ranking,
@@ -161,7 +163,6 @@ export function Dashboard() {
           Awaited<ReturnType<typeof dashboardApi.payment>>,
           Awaited<ReturnType<typeof dashboardApi.disposition>>,
           Awaited<ReturnType<typeof dashboardApi.admission>>,
-          Awaited<ReturnType<typeof dashboardApi.medicalSurgical>>,
           Awaited<ReturnType<typeof dashboardApi.kpi>>,
           Awaited<ReturnType<typeof dashboardApi.resources>>,
           Awaited<ReturnType<typeof dashboardApi.ranking>>,
@@ -175,7 +176,6 @@ export function Dashboard() {
           payment: payment.data,
           disposition: disposition.data,
           admission: admission.data,
-          medicalSurgical: medicalSurgical.data,
           kpi: kpi.data,
           resources: resources.data,
           ranking: ranking.data,
@@ -193,6 +193,22 @@ export function Dashboard() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, [filters, page, rankingBy, hospitalKeyword]);
+
+  useEffect(() => {
+    if (patientStructureView !== "medicalSurgical") return;
+    const controller = new AbortController();
+    setMedicalSurgicalLoading(true);
+    dashboardApi
+      .medicalSurgical(filters, controller.signal)
+      .then((response) => setMedicalSurgical(response.data))
+      .catch((error) => {
+        if (error.name !== "AbortError") setError(error.message || "内外科数据加载失败");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setMedicalSurgicalLoading(false);
+      });
+    return () => controller.abort();
+  }, [filters, patientStructureView]);
 
   const changeArea = (value: string) => {
     setPage(1);
@@ -375,7 +391,7 @@ export function Dashboard() {
     });
   }, [data?.admission]);
   const medicalSurgicalOption = useMemo(() => {
-    const items = data?.medicalSurgical ?? [];
+    const items = medicalSurgical ?? [];
     const barData = items.map((item) => ({
       ...item,
       value: item.discharge_count,
@@ -428,7 +444,7 @@ export function Dashboard() {
         },
       ],
     });
-  }, [data?.medicalSurgical]);
+  }, [medicalSurgical]);
   const systemsOption = useMemo(() => {
     const points: SystemChartPoint[] = (data?.systems ?? [])
       .slice(0, 10)
@@ -448,7 +464,7 @@ export function Dashboard() {
           return `${point.code}<br/>${point.description}<br/>出院记录数：${number(point.value)}`;
         },
       },
-      grid: { top: 8, right: 14, bottom: 28, left: 38, containLabel: true },
+      grid: { top: 6, right: 14, bottom: 18, left: 28, containLabel: true },
       xAxis: {
         ...axis,
         type: "category",
@@ -555,8 +571,6 @@ export function Dashboard() {
         yAxis: {
           ...axis,
           type: "value",
-          name: "平均成本",
-          nameTextStyle: { color: "#9eb7cc" },
         },
         visualMap: {
           min: 2,
@@ -781,7 +795,9 @@ export function Dashboard() {
                 </div>
               }
             >
-              {loading ? (
+              {loading ||
+              (patientStructureView === "medicalSurgical" &&
+                medicalSurgicalLoading) ? (
                 <State>加载中...</State>
               ) : (
                 <EChart
@@ -806,7 +822,19 @@ export function Dashboard() {
               ))}
             </div>
             <div className="center-charts">
-              <Panel title="医院资源与成本">
+              <Panel
+                title="医院资源与成本"
+                action={
+                  <button
+                    className="chart-expand-trigger"
+                    onClick={() => setResourceModalOpen(true)}
+                    title="放大医院资源与成本图"
+                    aria-label="放大医院资源与成本图"
+                  >
+                    <Expand size={15} />
+                  </button>
+                }
+              >
                 <EChart option={bubbleOption} />
               </Panel>
               <Panel
@@ -920,6 +948,38 @@ export function Dashboard() {
           </aside>
         </div>
       </main>
+      {resourceModalOpen && (
+        <div
+          className="resource-modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setResourceModalOpen(false)}
+        >
+          <section
+            className="resource-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="医院资源与成本气泡图"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="resource-modal-head">
+              <div>
+                <strong>医院资源与成本</strong>
+                <small>横轴：出院量，纵轴：平均成本</small>
+              </div>
+              <button
+                onClick={() => setResourceModalOpen(false)}
+                title="关闭"
+                aria-label="关闭医院资源与成本图"
+              >
+                <X size={19} />
+              </button>
+            </header>
+            <div className="resource-modal-body">
+              <EChart className="resource-bubble-chart" option={bubbleOption} />
+            </div>
+          </section>
+        </div>
+      )}
       <AgentSidebar />
     </>
   );
