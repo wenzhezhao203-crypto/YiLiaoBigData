@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EChartsOption } from "echarts";
-import { Building2, CalendarDays, CircleDollarSign, Coins, Gauge, HeartPulse, RotateCcw, UsersRound } from "lucide-react";
+import { Building2, CalendarDays, CircleDollarSign, Coins, Gauge, HeartPulse, Hospital, RotateCcw, UsersRound } from "lucide-react";
 import { EChart } from "@/components/EChart";
+import { AgentSidebar } from "@/components/AgentSidebar";
 import { DiseaseDrilldown } from "@/components/DiseaseDrilldown";
 import { Panel, State } from "@/components/Panel";
 import { dashboardApi } from "@/lib/api";
@@ -76,7 +77,8 @@ export function Dashboard() {
 
   const kpis = data?.kpi ? [{ label: "医院数", value: number(data.kpi.hospital_count), icon: Building2, tone: "blue" }, { label: "出院量", value: number(data.kpi.discharge_count), icon: UsersRound, tone: "blue" }, { label: "平均住院天数", value: days(data.kpi.average_length_of_stay), icon: CalendarDays, tone: "cyan" }, { label: "总收费", value: money(data.kpi.total_charges), icon: CircleDollarSign, tone: "gold" }, { label: "总成本", value: money(data.kpi.total_costs), icon: Coins, tone: "cyan" }, { label: "平均收费", value: money(data.kpi.average_charge), icon: CircleDollarSign, tone: "gold" }, { label: "平均成本", value: money(data.kpi.average_cost), icon: Gauge, tone: "cyan" }, { label: "急诊占比", value: percent(data.kpi.emergency_ratio), icon: HeartPulse, tone: "orange" }] : [];
   const table = data?.comparison;
-  return <section className="dashboard-shell">
+  return <><main className="dashboard-shell">
+    <header className="topbar"><div className="brand"><Hospital size={28}/><div><small>MEDICAL INTELLIGENCE</small><h1>智慧医疗住院数据分析平台</h1></div></div><div className="updated">数据更新：{data?.updatedAt ? new Date(data.updatedAt).toLocaleString("zh-CN") : "--"}</div></header>
     <div className="filterbar"><label>医院服务区域<select value={filters.hospital_service_area ?? ""} onChange={e => changeArea(e.target.value)}><option value="">全部区域</option>{areas.map(x => <option key={x}>{x}</option>)}</select></label><label>医院所在县<select value={filters.hospital_county ?? ""} onChange={e => changeCounty(e.target.value)} disabled={!filters.hospital_service_area}><option value="">全部县</option>{counties.map(x => <option key={x}>{x}</option>)}</select></label><label>医疗机构名称<select value={filters.facility_name ?? ""} onChange={e => changeFacility(e.target.value)} disabled={!filters.hospital_county}><option value="">全部医院</option>{facilities.map(x => <option key={x}>{x}</option>)}</select></label><button className="reset" title="重置筛选" onClick={() => changeArea("")}><RotateCcw size={17}/></button></div>
     {error && <div className="connection-error">{error}。请确认 Flask 服务正在运行于 http://127.0.0.1:5000。</div>}
     <div className="dashboard-grid">
@@ -84,5 +86,5 @@ export function Dashboard() {
       <section className="column center-column"><h2 className="column-title">医院运营分析</h2><div className="kpi-grid">{kpis.map(({ label, value, icon: Icon, tone }) => <article className={`kpi ${tone}`} key={label}><Icon size={21}/><span>{label}</span><strong>{value}</strong></article>)}</div><div className="center-charts"><Panel title="医院资源与成本"><EChart option={bubbleOption}/></Panel><Panel title="医院运营排名" action={<select className="mini-select" value={rankingBy} onChange={e => setRankingBy(e.target.value)}><option value="discharge_count">按出院量</option><option value="total_charges">按总收费</option><option value="average_cost">按平均成本</option><option value="average_length_of_stay">按住院天数</option></select>}><EChart option={rankingOption}/></Panel></div><Panel title="医院对比表"><div className="table-wrap"><table suppressHydrationWarning><thead><tr><th>医院名称</th><th>所在县</th><th>出院量</th><th>平均住院天数</th><th>总收费</th><th>总成本</th><th>急诊占比</th></tr></thead><tbody>{table?.items.map(row => <tr key={row.facility_name}><td>{row.facility_name}</td><td>{row.hospital_county}</td><td>{number(row.discharge_count)}</td><td>{days(row.average_length_of_stay)}</td><td>{money(row.total_charges)}</td><td>{money(row.total_costs)}</td><td>{percent(row.emergency_ratio)}</td></tr>)}</tbody></table></div><div className="pagination"><span>共 {table?.total ?? 0} 家</span><button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>上一页</button><b>{page}</b><button disabled={!table || page * table.page_size >= table.total} onClick={() => setPage(p => p + 1)}>下一页</button></div></Panel></section>
       <aside className="column right-column"><h2 className="column-title">疾病与严重程度</h2><Panel title="疾病系统分布 (APR MDC)">{loading ? <State>加载中...</State> : <EChart className="chart disease-system-chart" option={systemsOption}/>}</Panel><Panel title="高发疾病 Top 10 (CCSR)">{loading ? <State>加载中...</State> : <EChart option={diagnosesOption}/>}</Panel><Panel title="病情严重程度分布">{loading ? <State>加载中...</State> : <EChart option={severityOption}/>}</Panel><DiseaseDrilldown filters={filters}/></aside>
     </div>
-  </section>;
+  </main><AgentSidebar /></>;
 }
