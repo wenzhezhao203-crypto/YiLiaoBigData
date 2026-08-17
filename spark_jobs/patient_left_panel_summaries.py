@@ -1,4 +1,4 @@
-"""Build the payment, disposition, and admission summaries for the BI left panel."""
+"""Build the patient-analysis summaries for the BI left panel."""
 
 from __future__ import annotations
 
@@ -71,6 +71,16 @@ def main() -> None:
         F.sum("length_of_stay").alias("length_of_stay_sum"),
     )
     write_summary(admission_emergency_summary, "patient_admission_emergency_summary")
+
+    medical_surgical_summary = source.where(
+        F.trim(F.col("apr_medical_surgical_description")).isin("Medical", "Surgical")
+    ).groupBy(*FILTER_COLUMNS, "apr_medical_surgical_description").agg(
+        F.count("id").alias("discharge_count"),
+        F.sum("length_of_stay").alias("length_of_stay_sum"),
+        F.sum("total_charges").alias("total_charges_sum"),
+        F.sum("total_costs").alias("total_costs_sum"),
+    )
+    write_summary(medical_surgical_summary, "patient_medical_surgical_summary")
 
     spark.stop()
 

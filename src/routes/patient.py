@@ -241,3 +241,46 @@ def get_admission_emergency():
         return success_response(data, filters, "patient_admission_emergency_summary")
     except ValueError as error:
         return error_response(str(error), 400)
+
+
+@patient_bp.get("/medical-surgical")
+def get_medical_surgical():
+    """Return medical and surgical case structure for the current filter scope."""
+    try:
+        filters = read_global_filters()
+        where_clause, parameters = build_where_clause(filters)
+        rows = fetch_rows(
+            f"""
+            SELECT apr_medical_surgical_description,
+                   SUM(discharge_count) AS discharge_count,
+                   SUM(length_of_stay_sum) AS length_of_stay_sum,
+                   SUM(total_charges_sum) AS total_charges,
+                   SUM(total_costs_sum) AS total_costs
+            FROM patient_medical_surgical_summary
+            {where_clause}
+            GROUP BY apr_medical_surgical_description
+            ORDER BY discharge_count DESC, apr_medical_surgical_description
+            """,
+            parameters,
+        )
+        total = sum(as_int(row["discharge_count"]) for row in rows)
+        data = [
+            {
+                "apr_medical_surgical_description": row[
+                    "apr_medical_surgical_description"
+                ],
+                "discharge_count": as_int(row["discharge_count"]),
+                "discharge_ratio": ratio(row["discharge_count"], total),
+                "average_length_of_stay": average(
+                    row["length_of_stay_sum"], row["discharge_count"]
+                ),
+                "total_charges": as_number(row["total_charges"]),
+                "total_costs": as_number(row["total_costs"]),
+                "average_charge": average(row["total_charges"], row["discharge_count"]),
+                "average_cost": average(row["total_costs"], row["discharge_count"]),
+            }
+            for row in rows
+        ]
+        return success_response(data, filters, "patient_medical_surgical_summary")
+    except ValueError as error:
+        return error_response(str(error), 400)
