@@ -2,7 +2,7 @@
 
 import { Bot, ChevronDown, LoaderCircle, Send, Sparkles, Wrench, X } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
-import { sendAgentMessage, type AgentToolCall } from "@/lib/agent-api";
+import { streamAgentMessage, type AgentToolCall } from "@/lib/agent-api";
 
 type Message = {
   id: number;
@@ -27,17 +27,30 @@ export function AgentSidebar() {
     const message = prompt.trim();
     if (!message || sending) return;
 
-    setMessages(current => [...current, { id: nextId.current++, role: "user", content: message }]);
+    const assistantMessageId = nextId.current++;
+    setMessages(current => [
+      ...current,
+      { id: nextId.current++, role: "user", content: message },
+      { id: assistantMessageId, role: "assistant", content: "" },
+    ]);
     setInput("");
     setSending(true);
     try {
-      const response = await sendAgentMessage(message);
-      setMessages(current => [...current, { id: nextId.current++, role: "assistant", content: response.reply, toolCalls: response.tool_calls }]);
+      await streamAgentMessage(message, {
+        onDelta: text => setMessages(current => current.map(item => item.id === assistantMessageId
+          ? { ...item, content: item.content + text }
+          : item)),
+        onToolCalls: toolCalls => setMessages(current => current.map(item => item.id === assistantMessageId
+          ? { ...item, toolCalls }
+          : item)),
+      });
     } catch (error) {
       const toolCalls = error instanceof Error && "toolCalls" in error
         ? (error.toolCalls as AgentToolCall[])
         : [];
-      setMessages(current => [...current, { id: nextId.current++, role: "assistant", content: error instanceof Error ? error.message : "暂时无法连接 AI 分析服务，请稍后重试。", toolCalls }]);
+      setMessages(current => current.map(item => item.id === assistantMessageId
+        ? { ...item, content: error instanceof Error ? error.message : "暂时无法连接 AI 分析服务，请稍后重试。", toolCalls }
+        : item));
     } finally {
       setSending(false);
     }

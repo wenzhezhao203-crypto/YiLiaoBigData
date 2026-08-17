@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
@@ -119,3 +120,62 @@ async def answer_question(message: str) -> ChatData:
     if not reply:
         reply = "本次分析未生成可展示的文字结论。"
     return ChatData(reply=reply, tool_calls=tool_calls)
+
+
+async def stream_answer_question(message: str) -> AsyncIterator[dict[str, Any]]:
+    """Yield model reply chunks and audited tool calls for an SSE response."""
+
+    try:
+        model = _build_model()
+        tool_enabled_model = model.bind_tools(LANGCHAIN_TOOLS)
+        base_messages: list[Any] = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=message)]
+        initial_response = await tool_enabled_model.ainvoke(base_messages)
+    except Exception:
+        yield {"event": "error", "data": {"message": "智能助手暂时不可用，请检查大模型配置和网络连接后重试。"}}
+        return
+
+    messages = [*base_messages, initial_response]
+    requested_calls = list(getattr(initial_response, "tool_calls", []) or [])
+    tool_calls: list[ToolCall] = []
+
+    for requested_call in requested_calls[:MAX_TOOL_CALLS]:
+        tool_name = str(requested_call.get("name", ""))
+        tool_call_id = str(requested_call.get("id", ""))
+        tool = TOOL_REGISTRY.get(tool_name)
+        if not tool or not tool_call_id:
+            continue
+        try:
+            result = await tool.ainvoke({})
+            tool_calls.append(ToolCall(name=tool_name, status="success"))
+            messages.append(_tool_result_message(tool_call_id, tool_name, result, "success"))
+        except Exception:
+            tool_calls.append(ToolCall(name=tool_name, status="failed"))
+            messages.append(
+                _tool_result_message(
+                    tool_call_id,
+                    tool_name,
+                    {"message": "The requested analytics service is unavailable."},
+                    "failed",
+                )
+            )
+
+    yield {"event": "tool_calls", "data": [item.model_dump() for item in tool_calls]}
+    # With no selected tool, make a second model call so its direct response can
+    # be delivered incrementally instead of returning the completed routing turn.
+    response_messages = messages if requested_calls else base_messages
+    reply_parts: list[str] = []
+    try:
+        async for chunk in model.astream(response_messages):
+            delta = _content_to_text(chunk.content)
+            if delta:
+                reply_parts.append(delta)
+                yield {"event": "delta", "data": {"text": delta}}
+    except Exception:
+        yield {"event": "error", "data": {"message": "智能摘要暂时不可用，请稍后重试。"}}
+        return
+
+    reply = "".join(reply_parts).strip()
+    if not reply:
+        yield {"event": "error", "data": {"message": "本次分析未生成可展示的文字结论。"}}
+        return
+    yield {"event": "done", "data": {"tool_calls": [item.model_dump() for item in tool_calls]}}
