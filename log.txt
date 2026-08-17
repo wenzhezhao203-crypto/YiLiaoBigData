@@ -99,3 +99,5 @@ PRE MDC	444
 
 cd web
 npm run dev -- --port 3000
+
+& "C:\useApp\Python\myVenv\BigData\Scripts\python.exe" -m uvicorn ai_service.app:app --host 0.0.0.0 --port 8000
