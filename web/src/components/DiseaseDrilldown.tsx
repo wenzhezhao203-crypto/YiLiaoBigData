@@ -30,7 +30,7 @@ function buildBubbleOption(items: DrilldownItem[], level: DrillLevel): EChartsOp
 
   return {
     tooltip: {
-      trigger: "item", backgroundColor: "#061725", borderColor: "#2b95ca", borderWidth: 1, padding: 11, textStyle: { color: "#e8f5ff", fontSize: 12 },
+      trigger: "item", confine: true, backgroundColor: "#061725", borderColor: "#2b95ca", borderWidth: 1, padding: 11, textStyle: { color: "#e8f5ff", fontSize: 12 }, extraCssText: "max-width:310px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;",
       formatter: (params: unknown) => {
         const node = (params as { data?: BubbleNode }).data;
         if (!node) return "";
