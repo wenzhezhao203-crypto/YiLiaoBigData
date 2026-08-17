@@ -379,6 +379,7 @@ export function Dashboard() {
       tooltip: {
         trigger: "item",
         confine: true,
+        extraCssText: "max-width:230px; white-space:normal; overflow-wrap:anywhere; word-break:break-word;",
         formatter: (params) => {
           const current = Array.isArray(params) ? params[0] : params;
           const point = current?.data as SystemChartPoint;
