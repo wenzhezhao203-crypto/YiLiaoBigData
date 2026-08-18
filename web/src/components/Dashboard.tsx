@@ -464,14 +464,21 @@ export function Dashboard() {
           return `${point.code}<br/>${point.description}<br/>出院记录数：${number(point.value)}`;
         },
       },
-      grid: { top: 6, right: 14, bottom: 18, left: 28, containLabel: true },
+      grid: { top: 8, right: -5, bottom: -15, left: 42, containLabel: false },
       xAxis: {
         ...axis,
         type: "category",
         data: points.map((point) => point.code),
         axisLabel: { ...axis.axisLabel, interval: 0 },
+        axisLine: { show: true, lineStyle: { color: "#6e9ab8", width: 1 } },
+        axisTick: { show: true, lineStyle: { color: "#6e9ab8" } },
       },
-      yAxis: { ...axis, type: "value" },
+      yAxis: {
+        ...axis,
+        type: "value",
+        axisLine: { show: true, lineStyle: { color: "#6e9ab8", width: 1 } },
+        axisTick: { show: true, lineStyle: { color: "#6e9ab8" } },
+      },
       series: [
         {
           type: "bar",
