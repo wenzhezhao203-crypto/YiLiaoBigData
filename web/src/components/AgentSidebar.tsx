@@ -1,8 +1,9 @@
 "use client";
 
-import { Bot, ChevronDown, LoaderCircle, Send, Sparkles, Wrench, X } from "lucide-react";
+import { Bot, ChevronDown, FileText, LoaderCircle, Send, Sparkles, Wrench, X } from "lucide-react";
 import { FormEvent, ReactNode, useRef, useState } from "react";
-import { streamAgentMessage, type AgentToolCall } from "@/lib/agent-api";
+import { createAndDownloadAgentReport, streamAgentMessage, type AgentReportType, type AgentToolCall } from "@/lib/agent-api";
+import type { DashboardFilters } from "@/lib/types";
 
 type Message = {
   id: number;
@@ -112,10 +113,12 @@ function renderAssistantContent(content: string) {
   return blocks.length ? blocks : <span className="agent-cursor" aria-label="正在生成回答" />;
 }
 
-export function AgentSidebar() {
+export function AgentSidebar({ filters = {} }: { filters?: DashboardFilters }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reportType, setReportType] = useState<AgentReportType>("comprehensive");
   const [messages, setMessages] = useState<Message[]>([
     { id: 0, role: "assistant", content: "你好，我可以基于当前住院数据回答医院运营、患者结构、急诊、疾病和费用相关问题。" },
   ]);
@@ -155,6 +158,31 @@ export function AgentSidebar() {
     }
   };
 
+  const generateReport = async () => {
+    if (sending || reporting) return;
+    setReporting(true);
+    try {
+      const report = await createAndDownloadAgentReport(reportType, filters);
+      setMessages(current => [
+        ...current,
+        {
+          id: nextId.current++,
+          role: "assistant",
+          content: `${report.title}已生成并开始下载。\n\n${report.executive_summary}`,
+          toolCalls: report.tool_calls,
+        },
+      ]);
+    } catch (error) {
+      setMessages(current => [...current, {
+        id: nextId.current++,
+        role: "assistant",
+        content: error instanceof Error ? error.message : "报告生成失败，请稍后重试。",
+      }]);
+    } finally {
+      setReporting(false);
+    }
+  };
+
   return <>
     <button className="agent-trigger" onClick={() => setOpen(true)} aria-label="打开 AI 数据助手" title="AI 数据助手">
       <Bot size={21}/><span>AI 助手</span>
@@ -170,9 +198,20 @@ export function AgentSidebar() {
         </article>)}
         {sending && <article className="agent-message assistant"><LoaderCircle className="agent-spin" size={15}/><div><p>正在调用数据分析工具...</p></div></article>}
       </div>
-      <div className="agent-suggestions">
-        <span>推荐提问</span>{SUGGESTIONS.map(suggestion => <button disabled={sending} key={suggestion} onClick={() => submit(undefined, suggestion)}>{suggestion}<ChevronDown size={12}/></button>)}
-      </div>
+       <div className="agent-suggestions">
+         <span>推荐提问</span>{SUGGESTIONS.map(suggestion => <button disabled={sending || reporting} key={suggestion} onClick={() => submit(undefined, suggestion)}>{suggestion}<ChevronDown size={12}/></button>)}
+         <div className="agent-report-row">
+           <select value={reportType} onChange={event => setReportType(event.target.value as AgentReportType)} disabled={sending || reporting} aria-label="报告类型">
+             <option value="comprehensive">综合住院报告</option>
+             <option value="operations">医院运营报告</option>
+             <option value="patient">患者结构报告</option>
+             <option value="disease">疾病风险报告</option>
+           </select>
+           <button className="agent-report-button" disabled={sending || reporting} onClick={generateReport}>
+             {reporting ? <LoaderCircle className="agent-spin" size={14}/> : <FileText size={14}/>}<span>{reporting ? "正在生成 Word" : "生成 Word 报告"}</span>
+           </button>
+         </div>
+       </div>
       <form className="agent-input" onSubmit={event => submit(event)}>
         <textarea value={input} onChange={event => setInput(event.target.value)} placeholder="请输入数据分析问题" maxLength={500} rows={2}/>
         <button disabled={!input.trim() || sending} aria-label="发送问题" title="发送"><Send size={16}/></button>

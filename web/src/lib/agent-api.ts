@@ -1,3 +1,5 @@
+import type { DashboardFilters } from "@/lib/types";
+
 export type AgentToolCall = { name: string; status: "success" | "failed" };
 
 export type AgentChatData = {
@@ -9,6 +11,18 @@ type AgentResponse = {
   code: number;
   message: string;
   data: AgentChatData;
+};
+
+export type AgentReportType = "comprehensive" | "operations" | "patient" | "disease";
+export type AgentReportData = {
+  report_id: string;
+  title: string;
+  report_type: AgentReportType;
+  download_path: string;
+  scope: DashboardFilters;
+  executive_summary: string;
+  tool_calls: AgentToolCall[];
+  generated_at: string;
 };
 
 const AGENT_BASE_URL = process.env.NEXT_PUBLIC_AGENT_API_BASE_URL ?? "/agent-api";
@@ -26,6 +40,35 @@ export async function sendAgentMessage(message: string, signal?: AbortSignal): P
     Object.assign(error, { toolCalls: payload.data?.tool_calls ?? [] });
     throw error;
   }
+  return payload.data;
+}
+
+export async function createAndDownloadAgentReport(
+  reportType: AgentReportType,
+  filters: DashboardFilters,
+  signal?: AbortSignal,
+): Promise<AgentReportData> {
+  const response = await fetch(`${AGENT_BASE_URL}/ai/report`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ report_type: reportType, filters }),
+    signal,
+  });
+  const payload = await response.json() as { code: number; message: string; data?: AgentReportData | null };
+  if (!response.ok || payload.code !== 0 || !payload.data) {
+    throw new Error(payload.message || "报告生成失败，请稍后重试。");
+  }
+  const downloadResponse = await fetch(`${AGENT_BASE_URL}${payload.data.download_path}`, { signal });
+  if (!downloadResponse.ok) throw new Error("报告已生成，但下载失败，请重试。");
+  const blob = await downloadResponse.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "medical_analysis_report.docx";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
   return payload.data;
 }
 

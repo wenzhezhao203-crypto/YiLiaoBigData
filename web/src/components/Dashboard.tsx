@@ -980,7 +980,7 @@ export function Dashboard() {
           </section>
         </div>
       )}
-      <AgentSidebar />
+      <AgentSidebar filters={filters} />
     </>
   );
 }

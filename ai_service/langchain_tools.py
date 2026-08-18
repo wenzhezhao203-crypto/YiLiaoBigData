@@ -15,6 +15,7 @@ TOOL_DESCRIPTIONS = {
     "get_payment": "查询主要支付方式分布。",
     "get_disposition": "查询离院去向排名。",
     "get_admission_emergency": "查询入院类型与急诊结构。",
+    "get_medical_surgical": "查询内科与外科的住院结构。",
     "get_hospital_ranking": "查询医院运营排名。",
     "get_disease_systems": "查询疾病系统分布。",
     "get_top_diagnoses": "查询高发疾病排名。",
